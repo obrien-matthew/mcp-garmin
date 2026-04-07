@@ -1,0 +1,12 @@
+# Changes here will be overwritten by Copier
+_commit: v0.1.0
+_src_path: gh:obrien-matthew/mcp-template
+author_email: obrien.mlotwis@gmail.com
+author_name: Matthew O'Brien
+coverage_threshold: 50
+github_org: obrien-matthew
+package_name: mcp-garmin
+service_dependency: garminconnect>=0.2.25
+service_name: Garmin Connect
+service_slug: garmin
+topic_classifier: "Topic :: Scientific/Engineering :: Medical Science Apps."

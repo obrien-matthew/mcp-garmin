@@ -1,9 +1,20 @@
 """MCP server for Garmin Connect."""
 
+from collections.abc import Callable
+from typing import Any
+
 from mcp.server.fastmcp import FastMCP
 
 from .client import GarminClientError, call
 from .formatting import format_response
+from .transforms import (
+    trim_activity_list,
+    trim_heart_rates,
+    trim_hrv,
+    trim_respiration,
+    trim_sleep,
+    trim_stress,
+)
 from .validation import validate_date, validate_limit
 
 mcp = FastMCP("mcp-garmin")
@@ -16,15 +27,21 @@ mcp = FastMCP("mcp-garmin")
 
 def _garmin_call(
     method: str,
-    *args: object,
+    *args: Any,
     empty_message: str = "No data available.",
-    **kwargs: object,
+    transform: Callable[[Any], Any] | None = None,
+    **kwargs: Any,
 ) -> str:
-    """Call a Garmin client method, format the result, handle errors."""
+    """Call a Garmin client method, format the result, handle errors.
+
+    If *transform* is provided it is applied to the raw data before formatting.
+    """
     try:
         data = call(method, *args, **kwargs)
     except GarminClientError as exc:
         return str(exc)
+    if transform is not None and data is not None:
+        data = transform(data)
     return format_response(data, empty_message=empty_message)
 
 
@@ -55,7 +72,10 @@ def get_heart_rates(date: str) -> str:
     """
     d = validate_date(date)
     return _garmin_call(
-        "get_heart_rates", d, empty_message=f"No heart rate data for {d}."
+        "get_heart_rates",
+        d,
+        empty_message=f"No heart rate data for {d}.",
+        transform=trim_heart_rates,
     )
 
 
@@ -67,7 +87,12 @@ def get_sleep_data(date: str) -> str:
         date: Date in YYYY-MM-DD format.
     """
     d = validate_date(date)
-    return _garmin_call("get_sleep_data", d, empty_message=f"No sleep data for {d}.")
+    return _garmin_call(
+        "get_sleep_data",
+        d,
+        empty_message=f"No sleep data for {d}.",
+        transform=trim_sleep,
+    )
 
 
 @mcp.tool()
@@ -78,19 +103,11 @@ def get_stress_data(date: str) -> str:
         date: Date in YYYY-MM-DD format.
     """
     d = validate_date(date)
-    return _garmin_call("get_stress_data", d, empty_message=f"No stress data for {d}.")
-
-
-@mcp.tool()
-def get_all_day_stress(date: str) -> str:
-    """Get all-day stress summary for a given date.
-
-    Args:
-        date: Date in YYYY-MM-DD format.
-    """
-    d = validate_date(date)
     return _garmin_call(
-        "get_all_day_stress", d, empty_message=f"No stress data for {d}."
+        "get_stress_data",
+        d,
+        empty_message=f"No stress data for {d}.",
+        transform=trim_stress,
     )
 
 
@@ -126,7 +143,12 @@ def get_hrv_data(date: str) -> str:
         date: Date in YYYY-MM-DD format.
     """
     d = validate_date(date)
-    return _garmin_call("get_hrv_data", d, empty_message=f"No HRV data for {d}.")
+    return _garmin_call(
+        "get_hrv_data",
+        d,
+        empty_message=f"No HRV data for {d}.",
+        transform=trim_hrv,
+    )
 
 
 @mcp.tool()
@@ -149,7 +171,10 @@ def get_respiration_data(date: str) -> str:
     """
     d = validate_date(date)
     return _garmin_call(
-        "get_respiration_data", d, empty_message=f"No respiration data for {d}."
+        "get_respiration_data",
+        d,
+        empty_message=f"No respiration data for {d}.",
+        transform=trim_respiration,
     )
 
 
@@ -192,7 +217,7 @@ def get_resting_heart_rate(date: str) -> str:
     """
     d = validate_date(date)
     return _garmin_call(
-        "get_resting_heart_rate",
+        "get_rhr_day",
         d,
         empty_message=f"No resting heart rate data for {d}.",
     )
@@ -216,6 +241,7 @@ def get_activities(start: int = 0, limit: int = 20) -> str:
         start,
         validate_limit(limit),
         empty_message="No activities found.",
+        transform=trim_activity_list,
     )
 
 
@@ -238,26 +264,18 @@ def get_activities_by_date(
         ed,
         activity_type,
         empty_message=f"No activities found between {sd} and {ed}.",
-    )
-
-
-@mcp.tool()
-def get_activities_for_date(date: str) -> str:
-    """Get all activities for a specific date.
-
-    Args:
-        date: Date in YYYY-MM-DD format.
-    """
-    d = validate_date(date)
-    return _garmin_call(
-        "get_activities_fordate", d, empty_message=f"No activities on {d}."
+        transform=trim_activity_list,
     )
 
 
 @mcp.tool()
 def get_last_activity() -> str:
     """Get the most recent activity."""
-    return _garmin_call("get_last_activity", empty_message="No activities found.")
+    return _garmin_call(
+        "get_last_activity",
+        empty_message="No activities found.",
+        transform=trim_activity_list,
+    )
 
 
 @mcp.tool()
@@ -283,6 +301,8 @@ def get_activity_details(activity_id: int) -> str:
         "get_activity_details",
         activity_id,
         empty_message=f"No details for activity {activity_id}.",
+        maxchart=0,
+        maxpoly=0,
     )
 
 
@@ -422,7 +442,6 @@ def get_weigh_ins(start_date: str, end_date: str) -> str:
     )
 
 
-
 # ---------------------------------------------------------------------------
 # Profile & Fitness
 # ---------------------------------------------------------------------------
@@ -475,5 +494,5 @@ def get_training_status(date: str) -> str:
 def get_personal_records() -> str:
     """Get personal best records across all activities."""
     return _garmin_call(
-        "get_personal_records", empty_message="No personal records found."
+        "get_personal_record", empty_message="No personal records found."
     )

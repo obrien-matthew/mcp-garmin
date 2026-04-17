@@ -13,4 +13,4 @@ def format_response(data: Any, *, empty_message: str = "No data available.") -> 
         return empty_message
     if isinstance(data, (list, dict)) and not data:
         return empty_message
-    return json.dumps(data, default=str, indent=2)
+    return json.dumps(data, default=str)
